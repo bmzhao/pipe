@@ -11,8 +11,8 @@ int main(int argc, TCHAR* argv[])
 {
     std::cout << "Start execution" << std::endl;
 
-    HANDLE parent_pipe = NULL;
-    HANDLE child_pipe = NULL;
+    HANDLE childStdOutRead = NULL;
+    HANDLE childStdOutWrite = NULL;
     SECURITY_ATTRIBUTES saAttr;
 
     // Set the bInheritHandle flag so pipe handles are inherited. 
@@ -22,13 +22,13 @@ int main(int argc, TCHAR* argv[])
 
     // Create a pipe for the child process's STDOUT. 
 
-    if (!CreatePipe(&parent_pipe, &child_pipe, &saAttr, 0)) {
+    if (!CreatePipe(&childStdOutRead, &childStdOutWrite, &saAttr, 0)) {
         std::cout << "failed to create pipe, exiting..." << std::endl;
         exit(1);
     }
 
     // Ensure the read handle to the pipe for STDOUT is not inherited.
-    SetHandleInformation(parent_pipe, HANDLE_FLAG_INHERIT, 0);
+    SetHandleInformation(childStdOutRead, HANDLE_FLAG_INHERIT, 0);
 
     // Create the child process. 
     PROCESS_INFORMATION pi;
@@ -41,7 +41,7 @@ int main(int argc, TCHAR* argv[])
     // Set up members of the STARTUPINFO structure.
     ZeroMemory(&si, sizeof(STARTUPINFO));
     si.cb = sizeof(STARTUPINFO);
-    si.hStdOutput = child_pipe;
+    si.hStdOutput = childStdOutWrite;
     si.dwFlags |= STARTF_USESTDHANDLES;
 
     // Create the child process.
@@ -65,6 +65,7 @@ int main(int argc, TCHAR* argv[])
     }
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
+    CloseHandle(childStdOutWrite);
 
     // Read from pipe that is the standard output for child process. 
     std::cout << "output of the child process:" << std::endl;
@@ -73,8 +74,8 @@ int main(int argc, TCHAR* argv[])
 
     while (true)
     {
-        bSuccess = ReadFile(parent_pipe, chBuf, BUFSIZE, &dwRead, NULL);
-        std::cout << chBuf << std::endl;
+        bSuccess = ReadFile(childStdOutRead, chBuf, BUFSIZE, &dwRead, NULL);
+        std::cout << std::string(chBuf, dwRead);
         if (!bSuccess || dwRead == 0) break;
     }
 
